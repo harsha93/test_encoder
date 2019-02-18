@@ -1,4 +1,4 @@
-/* A prototype tool to measure jitter */
+/* A prototype tool to measure jitter   */
 
 
 /*  #include <sys/types.h> */
