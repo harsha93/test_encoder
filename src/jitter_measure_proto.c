@@ -70,7 +70,7 @@ set_input_mode (int fd_serial_usb)
 
 
   /* set the attributes for tuning read() */
-  tattr.c_cc[VMIN] = 41;
+  tattr.c_cc[VMIN] = 50;
   tattr.c_cc[VTIME] = 1;
   tcsetattr (fd_serial_usb, TCSAFLUSH, &tattr);
 }
@@ -86,10 +86,10 @@ main (void)
   const int FALSE = 0;
   int state = TRUE;
   int loop = 0;
-  int input_buffer_size = -1;
+  /* int input_buffer_size = -1; */
   
 
-  in case of SIGINT
+  /* in case of SIGINT */
   signal(SIGINT, signal_callback_handler);
 
   /* opening the file */
