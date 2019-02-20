@@ -136,7 +136,7 @@ main (void)
 
 
       state = (loop == 0) ? state = FALSE : ++loop;
-      printf("input string %d:  %s \n", read_USB, read_buffer_USB);
+      printf("%s \n", read_buffer_USB);
     }
 
 
