@@ -112,7 +112,7 @@ main (void)
   const int FALSE = 0;
   int state = TRUE;
   int loop = 0;
-  int input_buffer_size = -1;
+  /* int input_buffer_size = -1; */
   
 
   /* in case of SIGINT */
@@ -140,14 +140,14 @@ main (void)
   while (state)
     {
 	/* giving a speed */
-      written_USB = write (fd_serial_usb, "!S 1 50\r", 8);
+      written_USB = write (fd_serial_usb, "!P 1 1000\r", 10);
       if (written_USB < 0){
 	  puts ("error writing to serial port");
 	  exit (EXIT_FAILURE);
       }
 
-      /* wait for the input queue(from the perspective of the PC) to be full */
-      tcdrain (fd_serial_usb);
+      /* /\* wait for the input queue(from the perspective of the PC) to be full *\/ */
+      /* tcdrain (fd_serial_usb); */
 
 
 
@@ -168,7 +168,7 @@ main (void)
       }
 
 
-      sleep(1);
+
       read_USB = read (fd_serial_usb, &read_buffer_USB, 49);
       if (read_USB < 0){
 	  puts ("error reading from serial port");
@@ -182,14 +182,14 @@ main (void)
 	  read_buffer_USB[read_USB] = 0;
 
 
-
-      if (loop == 2) {
+      printf("%s \n", read_buffer_USB);
+      if (loop == 5) {
 	  state = FALSE;
       }
       else {
 	  loop = loop + 1;
       }
-      printf("%s \n", read_buffer_USB);
+
     }
 
 
