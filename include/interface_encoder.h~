@@ -1,0 +1,12 @@
+/**
+ * interface for the test_encoder. Contains tty settings        
+ * @copyright 2019 by Manne Harshavardhan             
+ * @license BSD            
+ * @author Manne Harshavardhan <mha@mir-robots.com>
+ * @version 2019-02-22
+ * @file
+ */
+
+
+#ifndef INTERFACE_ENCODER_H
+#define INTERFACE_ENCODER_H

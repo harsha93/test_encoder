@@ -11,12 +11,38 @@
 #include <unistd.h>
 
 
+struct termios saved_attributes;
+static int fd_serial_usb = -1;
 
+
+/* difference between two timespec structures; courtesy GNU C library */
+int
+timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
+{
+  /* Perform the carry for the later subtraction by updating y. */
+  if (x->tv_usec < y->tv_usec) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+    y->tv_usec -= 1000000 * nsec;
+    y->tv_sec += nsec;
+  }
+  if (x->tv_usec - y->tv_usec > 1000000) {
+    int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+    y->tv_usec += 1000000 * nsec;
+    y->tv_sec -= nsec;
+  }
+
+  /* Compute the time remaining to wait.
+     tv_usec is certainly positive. */
+  result->tv_sec = x->tv_sec - y->tv_sec;
+  result->tv_usec = x->tv_usec - y->tv_usec;
+
+  /* Return 1 if result is negative. */
+  return x->tv_sec < y->tv_sec;
+}
 
 /* Use this variable to remember original terminal attributes. */
 
-struct termios saved_attributes;
-static int fd_serial_usb = -1;
+
 
 static void
 reset_input_mode (void)
@@ -70,8 +96,8 @@ set_input_mode (int fd_serial_usb)
 
 
   /* set the attributes for tuning read() */
-  tattr.c_cc[VMIN] = 50;
-  tattr.c_cc[VTIME] = 1;
+  tattr.c_cc[VMIN] = 4;
+  tattr.c_cc[VTIME] = 1 ;
   tcsetattr (fd_serial_usb, TCSAFLUSH, &tattr);
 }
 
@@ -86,7 +112,7 @@ main (void)
   const int FALSE = 0;
   int state = TRUE;
   int loop = 0;
-  /* int input_buffer_size = -1; */
+  int input_buffer_size = -1;
   
 
   /* in case of SIGINT */
@@ -102,9 +128,19 @@ main (void)
   
   set_input_mode (fd_serial_usb);
   /* puts("starting reading and writing \n\n"); */
+  /* setting the echo off */
+  written_USB = write (fd_serial_usb, "^ECHOF 1\r", 9);
+  if (written_USB < 0){
+      puts ("error writing to serial port");
+      exit (EXIT_FAILURE);
+  }
+
+  written_USB = -1;
+
   while (state)
     {
-      written_USB = write (fd_serial_usb, "?FID\r", 5);
+	/* giving a speed */
+      written_USB = write (fd_serial_usb, "!S 1 50\r", 8);
       if (written_USB < 0){
 	  puts ("error writing to serial port");
 	  exit (EXIT_FAILURE);
@@ -122,20 +158,37 @@ main (void)
       /* 	  puts("error with ioctl()"); */
 	  
       /* } */
-      
-      
+
+      written_USB = -1;
+      /* querying the encoder */
+      written_USB = write (fd_serial_usb, "?C 1\r", 5);
+      if (written_USB < 0){
+	  puts ("error writing to serial port");
+	  exit (EXIT_FAILURE);
+      }
+
+
+      sleep(1);
       read_USB = read (fd_serial_usb, &read_buffer_USB, 49);
       if (read_USB < 0){
 	  puts ("error reading from serial port");
 	  exit (EXIT_FAILURE);
       }
 
+      
+
       /* set the last array cell to null so it can be read by printf */
       if (read_USB > 0)
 	  read_buffer_USB[read_USB] = 0;
 
 
-      state = (loop == 0) ? state = FALSE : ++loop;
+
+      if (loop == 2) {
+	  state = FALSE;
+      }
+      else {
+	  loop = loop + 1;
+      }
       printf("%s \n", read_buffer_USB);
     }
 
