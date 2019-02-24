@@ -3,24 +3,38 @@
       #include <unistd.h>
       #include <fcntl.h>
       #include <signal.h>
-      #include<stdlib.h>
-        
-      #define BAUDRATE B38400
+      #include <stdlib.h>
+      #include <time.h>  
+
+
+
       #define MODEMDEVICE "/dev/ttyS1"
       #define FALSE 0
       #define TRUE 1
         
-      volatile int STOP=FALSE; 
-        
+      volatile int STOP=FALSE;
+      struct time_encoder {
+	  struct timespec timestamp;
+	  char encoder_count[60];
+      };
+      volatile int count;
+      volatile struct time_encoder time_encoder_array[1000];
+      volatile int read_USB = -1;
+      int fd;
+      char read_buffer_USB[50];
+
+
+
       void signal_handler_IO (int status);   /* definition of signal handler */
-      int wait_flag=TRUE;                    /* TRUE while no signal received */
+
         
       int main()
       {
-        int fd,c, res;
+     
         struct termios oldtio,newtio;
         struct sigaction saio;           /* definition of signal action */
-        char buf[255];
+	int written_USB = -1;
+
         
         /* open the device to be non-blocking (read will return immediatly) */
         fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -28,9 +42,9 @@
         
         /* install the signal handler before making the device asynchronous */
         saio.sa_handler = signal_handler_IO;
-        saio.sa_mask = 0;
+	sigemptyset(&saio.sa_mask);
         saio.sa_flags = 0;
-        saio.sa_restorer = NULL;
+
         sigaction(SIGIO,&saio,NULL);
           
         /* allow the process to receive SIGIO */
@@ -41,42 +55,82 @@
         
         tcgetattr(fd,&oldtio); /* save current port settings */
         /* set new port settings for canonical input processing */
-        newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
-        newtio.c_iflag = IGNPAR | ICRNL;
-        newtio.c_oflag = 0;
-        newtio.c_lflag = ICANON;
-        newtio.c_cc[VMIN]=1;
-        newtio.c_cc[VTIME]=0;
+	  /* set the BSD style raw mode */
+	cfmakeraw (&newtio);
+	newtio.c_cflag |= CREAD | CLOCAL;
+
+
+
+	/* only need 1 stop bit */
+	newtio.c_cflag &= ~CSTOPB;
+
+	/* no hardware flowcontrol */
+	newtio.c_cflag &= ~CRTSCTS;
+
+	/* set the baud rate */
+	cfsetspeed (&newtio,B115200);
+
+	
+	/* set the attributes for tuning read() */
+	newtio.c_cc[VMIN] = 1;
+	newtio.c_cc[VTIME] = 0 ;
+	cfsetspeed (&newtio, B115200);
         tcflush(fd, TCIFLUSH);
-        tcsetattr(fd,TCSANOW,&newtio);
+	tcsetattr (fd, TCSAFLUSH, &newtio);
+
+
+	
+	written_USB = write (fd, "^ECHOF 1\r", 9);
+	if (written_USB < 0){
+	    puts ("error writing to serial port");
+	    exit (EXIT_FAILURE);
+	}
+	written_USB = -1;
+
+
          
-        /* loop while waiting for input. normally we would do something
-           useful here */ 
+        /* loop while waiting for input */ 
         while (STOP==FALSE) {
-          printf(".\n");usleep(100000);
-          /* after receiving SIGIO, wait_flag = FALSE, input is available
-             and can be read */
-          if (wait_flag==FALSE) { 
-            res = read(fd,buf,255);
-            buf[res]=0;
-            printf(":%s:%d\n", buf, res);
-            if (res==1) STOP=TRUE; /* stop loop if only a CR was input */
-            wait_flag = TRUE;      /* wait for new input */
-          }
-        }
-        /* restore old port settings */
-       tcsetattr(fd,TCSANOW,&oldtio);
-         return EXIT_SUCCESS;
-      }
+	/* giving a speed */
+	    written_USB = write (fd, "!P 1 1000\r", 10);
+	    if (written_USB < 0){
+		perror("write_USB");
+		exit (EXIT_FAILURE);
+	    }
+	    
+	    usleep(1000);
+	    
+	    }
         
-      /***************************************************************************
-      * signal handler. sets wait_flag to FALSE, to indicate above loop that     *
-      * characters have been received.                                           *
-      ***************************************************************************/
+        /* restore old port settings */
+	tcsetattr(fd,TCSANOW,&oldtio);
+
+
+
+	    
+	return EXIT_SUCCESS;
+      }
         
       void signal_handler_IO (int status)
       {
-        printf("received SIGIO signal.\n");
-        wait_flag = FALSE;
+	  clock_gettime(CLOCK_MONOTONIC, (struct timespec *) &time_encoder_array[count].timestamp);
+	  
+	  if (read (fd, (void *) &time_encoder_array[count].encoder_count, 49)) {
+	      time_encoder_array[count].encoder_count[read_USB] = 0;
+	  }
+	  else{
+	      perror("read USB");
+	      exit (EXIT_FAILURE);
+	  }
+	  
+	  count = count + 1;
+	  if (count == 999)
+	      STOP = TRUE;
       }
     
+
+
+
+/* writes the timespec and the array in the signal handler */
+
+/* TODO: get the difference in timespec, store it in a file */
